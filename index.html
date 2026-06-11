@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Second Brain Reader</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    background: #f6f7fb;
+    color: #222;
+}
+
+header {
+    background: white;
+    padding: 20px;
+    border-bottom: 1px solid #ddd;
+    position: sticky;
+    top: 0;
+}
+
+header h1 {
+    margin: 0;
+}
+
+.container {
+    max-width: 1000px;
+    margin: auto;
+    padding: 20px;
+}
+
+.tabs {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+button {
+    padding: 10px 14px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+button.active {
+    background: #222;
+    color: white;
+}
+
+.section {
+    display: none;
+}
+
+.section.active {
+    display: block;
+}
+
+.card {
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+}
+
+textarea, input {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+.small {
+    font-size: 13px;
+    color: #666;
+}
+
+.flashcard {
+    background: #fff;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+}
+
+.highlight {
+    background: #eef3ff;
+    padding: 8px;
+    border-radius: 8px;
+    margin-top: 8px;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>📚 Second Brain Reader</h1>
+</header>
+
+<div class="container">
+
+<div class="tabs">
+<button class="active" onclick="showTab('write', this)">Add Article</button>
+<button onclick="showTab('library', this)">Library</button>
+<button onclick="showTab('insights', this)">Insights</button>
+<button onclick="showTab('flashcards', this)">Flashcards</button>
+</div>
+
+<!-- ADD ARTICLE -->
+<div id="write" class="section active">
+<div class="card">
+<h3>Paste your article / notes</h3>
+
+<input id="title" placeholder="Title">
+
+<textarea id="content" rows="10" placeholder="Paste your article here..."></textarea>
+
+<button onclick="saveArticle()">Save & Process</button>
+</div>
+</div>
+
+<!-- LIBRARY -->
+<div id="library" class="section">
+<div id="articles"></div>
+</div>
+
+<!-- INSIGHTS -->
+<div id="insights" class="section">
+<div id="insightBox"></div>
+</div>
+
+<!-- FLASHCARDS -->
+<div id="flashcards" class="section">
+<div id="flashcardBox"></div>
+</div>
+
+</div>
+
+<script>
+
+function getArticles(){
+return JSON.parse(localStorage.getItem("sbr_articles") || "[]");
+}
+
+function saveArticles(data){
+localStorage.setItem("sbr_articles", JSON.stringify(data));
+}
+
+function showTab(id, btn){
+document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+document.getElementById(id).classList.add("active");
+
+document.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+btn.classList.add("active");
+
+if(id === "library") renderLibrary();
+if(id === "insights") renderInsights();
+if(id === "flashcards") renderFlashcards();
+}
+
+function saveArticle(){
+
+let articles = getArticles();
+
+let title = document.getElementById("title").value;
+let content = document.getElementById("content").value;
+
+let summary = generateSummary(content);
+let insights = extractInsights(content);
+let flashcards = generateFlashcards(content);
+
+articles.push({
+title,
+content,
+summary,
+insights,
+flashcards,
+date: new Date().toLocaleDateString()
+});
+
+saveArticles(articles);
+
+alert("Saved!");
+
+document.getElementById("title").value = "";
+document.getElementById("content").value = "";
+}
+
+function generateSummary(text){
+let sentences = text.split(".").slice(0, 3);
+return sentences.join(". ") + ".";
+}
+
+function extractInsights(text){
+let keywords = ["important", "because", "therefore", "however", "result", "key"];
+let insights = [];
+
+text.split(".").forEach(sentence => {
+keywords.forEach(k => {
+if(sentence.toLowerCase().includes(k)){
+insights.push(sentence.trim());
+}
+});
+});
+
+return insights.slice(0, 5);
+}
+
+function generateFlashcards(text){
+let sentences = text.split(".").filter(s => s.length > 20);
+return sentences.slice(0, 5).map(s => {
+return {
+q: "What does this mean?",
+a: s.trim()
+};
+});
+}
+
+function renderLibrary(){
+let articles = getArticles();
+let box = document.getElementById("articles");
+
+box.innerHTML = articles.map(a => `
+<div class="card">
+<h3>${a.title}</h3>
+<p class="small">${a.date}</p>
+<p>${a.summary}</p>
+</div>
+`).join("");
+}
+
+function renderInsights(){
+let articles = getArticles();
+let box = document.getElementById("insightBox");
+
+let all = articles.flatMap(a => a.insights);
+
+box.innerHTML = all.length ? all.map(i => `
+<div class="card highlight">${i}</div>
+`).join("") : "<p>No insights yet.</p>";
+}
+
+function renderFlashcards(){
+let articles = getArticles();
+let box = document.getElementById("flashcardBox");
+
+let cards = articles.flatMap(a => a.flashcards);
+
+box.innerHTML = cards.length ? cards.map(c => `
+<div class="flashcard">
+<strong>Q:</strong> ${c.q}<br><br>
+<strong>A:</strong> ${c.a}
+</div>
+`).join("") : "<p>No flashcards yet.</p>";
+}
+
+</script>
+
+</body>
+</html>
